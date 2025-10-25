@@ -669,7 +669,7 @@ pub use ratatui_widgets::canvas;
 pub use ratatui_widgets::chart::{Axis, Chart, Dataset, GraphType, LegendPosition};
 pub use ratatui_widgets::clear::Clear;
 pub use ratatui_widgets::gauge::{Gauge, LineGauge};
-pub use ratatui_widgets::list::{List, ListDirection, ListItem, ListState};
+pub use ratatui_widgets::list::{List, ListDirection, ListItem, ListItemsBuilder, ListState};
 pub use ratatui_widgets::logo::{RatatuiLogo, Size as RatatuiLogoSize};
 pub use ratatui_widgets::mascot::{MascotEyeColor, RatatuiMascot};
 pub use ratatui_widgets::paragraph::{Paragraph, Wrap};
@@ -742,7 +742,7 @@ pub trait FrameExt {
     /// frame.render_stateful_widget_ref(&list, area, &mut state);
     /// # }
     /// ```
-    /// [`Layout`]: crate::layout::Layout
+    /// [`Layout`] `crate::layout::Layout`
     fn render_stateful_widget_ref<W>(&mut self, widget: W, area: Rect, state: &mut W::State)
     where
         W: StatefulWidgetRef;

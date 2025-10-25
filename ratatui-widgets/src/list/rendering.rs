@@ -3,23 +3,23 @@ use ratatui_core::layout::Rect;
 use ratatui_core::text::{Line, ToLine};
 use ratatui_core::widgets::{StatefulWidget, Widget};
 
-use crate::block::BlockExt;
 use crate::list::{List, ListDirection, ListState};
+use crate::{block::BlockExt, list::ListItemsBuilder};
 
-impl Widget for List<'_> {
+impl<'a, B: ListItemsBuilder<'a>> Widget for List<'a, B> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         Widget::render(&self, area, buf);
     }
 }
 
-impl Widget for &List<'_> {
+impl<'a, B: ListItemsBuilder<'a>> Widget for &List<'a, B> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let mut state = ListState::default();
         StatefulWidget::render(self, area, buf, &mut state);
     }
 }
 
-impl StatefulWidget for List<'_> {
+impl<'a, B: ListItemsBuilder<'a>> StatefulWidget for List<'a, B> {
     type State = ListState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
@@ -27,7 +27,7 @@ impl StatefulWidget for List<'_> {
     }
 }
 
-impl StatefulWidget for &List<'_> {
+impl<'a, B: ListItemsBuilder<'a>> StatefulWidget for &List<'a, B> {
     type State = ListState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
@@ -69,13 +69,14 @@ impl StatefulWidget for &List<'_> {
 
         let mut current_height = 0;
         let selection_spacing = self.highlight_spacing.should_add(state.selected.is_some());
-        for (i, item) in self
-            .items
-            .iter()
-            .enumerate()
+        for i in (0..self.items.len())
             .skip(state.offset)
             .take(last_visible_index - first_visible_index)
         {
+            let Some(item) = self.items.build(i) else {
+                continue;
+            };
+
             let (x, y) = if self.direction == ListDirection::BottomToTop {
                 current_height += item.height() as u16;
                 (list_area.left(), list_area.bottom() - current_height)
@@ -124,7 +125,7 @@ impl StatefulWidget for &List<'_> {
     }
 }
 
-impl List<'_> {
+impl<'a, B: ListItemsBuilder<'a>> List<'a, B> {
     /// Given an offset, calculate which items can fit in a given area
     fn get_items_bounds(
         &self,
@@ -143,12 +144,18 @@ impl List<'_> {
 
         // Calculate the last visible index and total height of the items
         // that will fit in the available space
-        for item in self.items.iter().skip(offset) {
-            if height_from_offset + item.height() > max_height {
+        for i in (0..self.items.len()).skip(offset) {
+            let height = self
+                .items
+                .build(i)
+                .map(|item| item.height())
+                .unwrap_or_default();
+
+            if height_from_offset + height > max_height {
                 break;
             }
 
-            height_from_offset += item.height();
+            height_from_offset += height;
 
             last_visible_index += 1;
         }
@@ -170,16 +177,24 @@ impl List<'_> {
         // If we have an item selected that is out of the viewable area (or
         // the offset is still set), we still need to show this item
         while index_to_display >= last_visible_index {
-            height_from_offset =
-                height_from_offset.saturating_add(self.items[last_visible_index].height());
+            let height = self
+                .items
+                .build(last_visible_index)
+                .map(|item| item.height())
+                .unwrap_or_default();
+            height_from_offset = height_from_offset.saturating_add(height);
 
             last_visible_index += 1;
 
             // Now we need to hide previous items since we didn't have space
             // for the selected/offset item
             while height_from_offset > max_height {
-                height_from_offset =
-                    height_from_offset.saturating_sub(self.items[first_visible_index].height());
+                let height = self
+                    .items
+                    .build(first_visible_index)
+                    .map(|item| item.height())
+                    .unwrap_or_default();
+                height_from_offset = height_from_offset.saturating_sub(height);
 
                 // Remove this item to view by starting at the next item index
                 first_visible_index += 1;
@@ -191,15 +206,23 @@ impl List<'_> {
         while index_to_display < first_visible_index {
             first_visible_index -= 1;
 
-            height_from_offset =
-                height_from_offset.saturating_add(self.items[first_visible_index].height());
+            let height = self
+                .items
+                .build(first_visible_index)
+                .map(|item| item.height())
+                .unwrap_or_default();
+            height_from_offset = height_from_offset.saturating_add(height);
 
             // Don't show an item if it is beyond our viewable height
             while height_from_offset > max_height {
                 last_visible_index -= 1;
 
-                height_from_offset =
-                    height_from_offset.saturating_sub(self.items[last_visible_index].height());
+                let height = self
+                    .items
+                    .build(first_visible_index)
+                    .map(|item| item.height())
+                    .unwrap_or_default();
+                height_from_offset = height_from_offset.saturating_sub(height);
             }
         }
 
@@ -232,7 +255,12 @@ impl List<'_> {
                     .saturating_add(scroll_padding)
                     .min(last_valid_index)
             {
-                height_around_selected += self.items[index].height();
+                let height = self
+                    .items
+                    .build(index)
+                    .map(|item| item.height())
+                    .unwrap_or_default();
+                height_around_selected += height;
             }
             if height_around_selected <= max_height {
                 break;

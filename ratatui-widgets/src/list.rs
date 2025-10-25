@@ -1,6 +1,7 @@
 //! The [`List`] widget is used to display a list of items and allows selecting one or multiple
 //! items.
 
+use alloc::borrow::Cow;
 use alloc::vec::Vec;
 
 use ratatui_core::style::{Style, Styled};
@@ -106,11 +107,11 @@ mod state;
 /// [`StatefulWidget`]: ratatui_core::widgets::StatefulWidget
 /// [`Widget`]: ratatui_core::widgets::Widget
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Default)]
-pub struct List<'a> {
+pub struct List<'a, B = Vec<ListItem<'a>>> {
     /// An optional block to wrap the widget in
     pub(crate) block: Option<Block<'a>>,
     /// The items in the list
-    pub(crate) items: Vec<ListItem<'a>>,
+    pub(crate) items: B,
     /// Style used as a base style for the widget
     pub(crate) style: Style,
     /// List display direction
@@ -142,7 +143,31 @@ pub enum ListDirection {
     BottomToTop,
 }
 
-impl<'a> List<'a> {
+/// A trait for building a list of items
+pub trait ListItemsBuilder<'a> {
+    /// Returns the number of items in the list
+    fn len(&self) -> usize;
+
+    /// Returns if the list is empty
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Builds the item at the given index
+    fn build(&self, index: usize) -> Option<Cow<'_, ListItem<'a>>>;
+}
+
+impl<'a> ListItemsBuilder<'a> for Vec<ListItem<'a>> {
+    fn len(&self) -> usize {
+        self.len()
+    }
+
+    fn build(&self, index: usize) -> Option<Cow<'_, ListItem<'a>>> {
+        self.get(index).map(Cow::Borrowed)
+    }
+}
+
+impl<'a> List<'a, Vec<ListItem<'a>>> {
     /// Creates a new list from [`ListItem`]s
     ///
     /// The `items` parameter accepts any value that can be converted into an iterator of
@@ -220,6 +245,23 @@ impl<'a> List<'a> {
     {
         self.items = items.into_iter().map(Into::into).collect();
         self
+    }
+}
+
+impl<'a, B: ListItemsBuilder<'a>> List<'a, B> {
+    /// Creates a new list from a builder
+    pub fn with_builder(items: B) -> Self {
+        Self {
+            block: None,
+            style: Style::default(),
+            items,
+            direction: ListDirection::default(),
+            highlight_style: Style::default(),
+            highlight_symbol: Option::default(),
+            repeat_highlight_symbol: false,
+            highlight_spacing: HighlightSpacing::default(),
+            scroll_padding: 0,
+        }
     }
 
     /// Wraps the list with a custom [`Block`] widget.

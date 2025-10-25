@@ -18,7 +18,7 @@ fn list_should_shows_the_length() {
     assert_eq!(list.len(), 3);
     assert!(!list.is_empty());
 
-    let empty_list = List::default();
+    let empty_list: List<Vec<_>> = List::default();
     assert_eq!(empty_list.len(), 0);
     assert!(empty_list.is_empty());
 }
