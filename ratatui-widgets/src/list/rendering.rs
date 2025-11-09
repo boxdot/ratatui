@@ -219,7 +219,7 @@ impl<'a, B: ListItemsBuilder<'a>> List<'a, B> {
 
                 let height = self
                     .items
-                    .build(first_visible_index)
+                    .build(last_visible_index)
                     .map(|item| item.height())
                     .unwrap_or_default();
                 height_from_offset = height_from_offset.saturating_sub(height);
